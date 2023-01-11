@@ -5,6 +5,8 @@ import {
   InteractionType,
   verifyKey,
 } from "discord-interactions";
+import CommandInteraction from "./classes/CommandInteraction";
+import fetch from "node-fetch";
 
 const app = fastify();
 
@@ -14,6 +16,12 @@ app.get("/", (req, res) => {
 });
 
 const events = new EventEmitter();
+
+let client;
+
+export function getClient() {
+  return client;
+}
 
 export class Client {
   constructor(options: ClientOptions) {
@@ -50,13 +58,14 @@ export class Client {
 
         // Discord is sending us a command, let's handle it
         case InteractionType.APPLICATION_COMMAND:
-          console.log(body);
-          this.events.emit("command");
+          const interaction = new CommandInteraction(body, res);
+          this.events.emit("command", interaction);
       }
     });
   }
 
   public start() {
+    client = this;
     app.listen({ port: this.port }, (err) => {
       if (err) {
         throw err;
@@ -64,6 +73,30 @@ export class Client {
       this.events.emit("ready");
       return;
     });
+  }
+
+  public async sendRequest(
+    endpoint: string,
+    method: "GET" | "POST" | "PATCH" | "DELETE",
+    data?: any
+  ) {
+    const res = await fetch(`https://discord.com/api/v10${endpoint}`, {
+      method: method,
+      headers: {
+        Authorization: `Bot ${this.token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (res.status >= 400) throw new Error(await res.text());
+    if (res.status === 204) return;
+    try {
+      return res.json();
+    } catch (err) {
+      return res.text();
+    }
   }
 
   public fastify: FastifyInstance = app;

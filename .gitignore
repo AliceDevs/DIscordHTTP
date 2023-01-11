@@ -107,3 +107,4 @@ dist
 yarn.lock
 dist/
 test/config.json
+.yarn/
